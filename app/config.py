@@ -12,5 +12,5 @@ class Config:
     GOOGLE_REFRESH_TOKEN = os.environ["GOOGLE_REFRESH_TOKEN"]
     SLIDES_TEMPLATE_ID = os.environ["SLIDES_TEMPLATE_ID"]
     API_KEY = os.environ["API_KEY"]
-    SQLALCHEMY_DATABASE_URI = os.environ["DATABASE_URL"]
+    SQLALCHEMY_DATABASE_URI = os.environ["DATABASE_URL"].replace("postgres://", "postgresql://", 1)
     SQLALCHEMY_TRACK_MODIFICATIONS = False
