@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}History — SlidesMaker{% endblock %}
+{% block content %}
+<h2>Generation history</h2>
+<figure>
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Created</th>
+        <th>Email</th>
+        <th>File</th>
+        <th>Status</th>
+        <th>Deck</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for g in generations %}
+      <tr>
+        <td>{{ g.id }}</td>
+        <td>{{ g.created_at.strftime("%Y-%m-%d %H:%M") }}</td>
+        <td>{{ g.user_email }}</td>
+        <td>{{ g.pdf_filename or "—" }}</td>
+        <td>{{ g.status }}</td>
+        <td>
+          {% if g.deck_url %}
+          <a href="{{ g.deck_url }}" target="_blank">Open</a>
+          {% else %}—{% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6">No generations yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</figure>
+{% endblock %}

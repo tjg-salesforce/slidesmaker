@@ -1,0 +1,9 @@
+nav {
+  margin-bottom: 2rem;
+  border-bottom: 1px solid var(--pico-muted-border-color);
+  padding-bottom: 0.5rem;
+}
+
+textarea {
+  font-family: inherit;
+}

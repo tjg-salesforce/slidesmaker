@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Upload PDF — SlidesMaker{% endblock %}
+{% block content %}
+<h2>Upload a PDF</h2>
+<form method="POST" enctype="multipart/form-data">
+  <label>
+    PDF file
+    <input type="file" name="pdf" accept="application/pdf" required>
+  </label>
+  <label>
+    Recipient email
+    <input type="email" name="user_email" placeholder="user@salesforce.com" required>
+  </label>
+  <label>
+    Deck title (optional)
+    <input type="text" name="title" placeholder="Leave blank to auto-generate">
+  </label>
+  <button type="submit">Extract fields</button>
+</form>
+{% endblock %}

@@ -1,0 +1,13 @@
+{
+  "model": "claude-sonnet-4-6",
+  "system_prompt": "You are an expert at extracting structured information from customer-facing documents. Extract the requested fields accurately and concisely. Respond with valid JSON only — no markdown fences, no commentary.",
+  "user_prompt_prefix": "Extract the following fields from this document and return a JSON object with exactly these keys:\n\n",
+  "fields": {
+    "company_name": "The name of the customer company",
+    "executive_summary": "A 2-3 sentence summary of the customer's main challenge or goal",
+    "key_challenges": "Bullet-point list of the top 3-5 challenges the customer faces",
+    "proposed_solution": "The proposed solution or recommendation in 2-3 sentences",
+    "expected_outcomes": "Bullet-point list of expected business outcomes or benefits",
+    "next_steps": "Recommended next steps or call to action"
+  }
+}

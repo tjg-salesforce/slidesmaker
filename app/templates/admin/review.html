@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Review — SlidesMaker{% endblock %}
+{% block content %}
+<h2>Review extracted fields</h2>
+<p>Edit any fields before generating the deck.</p>
+<form method="POST">
+  {% for key, value in fields.items() %}
+  <label>
+    {{ key.replace("_", " ").title() }}
+    <textarea name="{{ key }}" rows="3">{{ value }}</textarea>
+  </label>
+  {% endfor %}
+  <input type="hidden" name="user_email" value="{{ user_email }}">
+  <input type="hidden" name="title" value="{{ title }}">
+  <button type="submit">Generate deck</button>
+</form>
+{% endblock %}
