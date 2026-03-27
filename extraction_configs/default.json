@@ -5,9 +5,9 @@
   "fields": {
     "company_name": "The name of the customer company",
     "executive_summary": "A 2-3 sentence summary of the customer's main challenge or goal",
-    "key_challenges": "Bullet-point list of the top 3-5 challenges the customer faces",
+    "key_challenges": "Top 3-5 challenges the customer faces, as a newline-separated string with each item starting with '• '",
     "proposed_solution": "The proposed solution or recommendation in 2-3 sentences",
-    "expected_outcomes": "Bullet-point list of expected business outcomes or benefits",
+    "expected_outcomes": "Expected business outcomes or benefits, as a newline-separated string with each item starting with '• '",
     "next_steps": "Recommended next steps or call to action"
   }
 }
