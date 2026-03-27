@@ -1,10 +1,14 @@
+import json
+import logging
+import os
+
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 
 from app import db
 from app.models import Generation
 from app.services import claude_service, pipeline
-import json
-import os
+
+logger = logging.getLogger(__name__)
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 
@@ -77,6 +81,7 @@ def review(id):
                 generation_id=id,
             )
         except Exception as e:
+            logger.exception("Generation failed")
             flash(f"Generation failed: {e}", "error")
             return redirect(url_for("admin.review", id=id, title=title))
 
