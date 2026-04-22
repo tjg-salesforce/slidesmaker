@@ -83,7 +83,7 @@ def extract_from_canvas_url(canvas_url: str, config: dict) -> dict:
         "type": "url",
         "url": current_app.config["SLACK_MCP_URL"],
         "name": "slack",
-        "authorization_token": f"Bearer {current_app.config['SLACK_TOKEN']}",
+        "authorization_token": current_app.config["SLACK_TOKEN"],
     }
 
     message = client.messages.create(
