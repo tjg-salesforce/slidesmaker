@@ -53,6 +53,9 @@ Added for canvas flow:
 - `SLACK_TOKEN` — `xoxp-…` user token used by Slack MCP
 - `SLACK_MCP_URL` — defaults to `https://mcp.slack.com/mcp`
 - `ADMIN_SLACK_USER_ID` — Slack user ID DMed with the traceback when the Slackbot auto-pipeline fails (see `POST /api/slack/generate`)
+- `SLACK_ENDPOINT_ALLOWED_DOMAINS` — comma-separated email-domain allowlist for `/api/slack/generate` (default `salesforce.com`)
+- `SLACK_ENDPOINT_RATE_LIMIT` — max requests per slack_user_id per window (default `5`)
+- `SLACK_ENDPOINT_RATE_WINDOW_SEC` — rate-limit sliding window in seconds (default `900` = 15 min)
 
 Known needed but **not yet wired**:
 - `DRIVE_LABEL_ID`, `DRIVE_LABEL_FIELD_ID`, `DRIVE_LABEL_EXTERNAL_CHOICE_ID` — for automating the DLP label flip (see Known Issues §1)
@@ -80,7 +83,6 @@ For skill-triggered runs (bypasses manual review):
 
 ```
 POST https://slidesmaker-bded4b9587fb.herokuapp.com/api/slack/generate
-Authorization: Bearer $API_KEY
 Content-Type: application/json
 
 {
@@ -92,6 +94,12 @@ Content-Type: application/json
   "canvas_content": "<raw canvas markdown>"
 }
 ```
+
+**Auth model:** no Bearer token (the skill canvas is widely shared, so secrets can't live there). Requests are scope-fenced by:
+- **email-domain allowlist** (`SLACK_ENDPOINT_ALLOWED_DOMAINS`, default `salesforce.com`) — rejects 403 if the recipient email's domain isn't in the list
+- **per-user rate limit** (`SLACK_ENDPOINT_RATE_LIMIT` / `SLACK_ENDPOINT_RATE_WINDOW_SEC`, default 5 req / 15 min per `slack_user_id`) — rejects 429 with `Retry-After` header when exceeded
+
+Residual risk (documented, not yet mitigated): a `@salesforce.com`-credentialed attacker can still trigger a DM from our Slack user to any target slack_user_id with a deck link containing attacker-controlled content (narrow internal phishing vector). If this graduates to a concern, next step is verifying `slack_user_id`'s email via MCP and requiring it match `email`.
 
 **Dual extraction modes:**
 - `canvas_url` (Option A): app reads the canvas via the Slack MCP connector. Known-good path. Requires the canvas to be readable by `SLACK_TOKEN`'s user.

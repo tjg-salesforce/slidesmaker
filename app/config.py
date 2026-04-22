@@ -15,5 +15,12 @@ class Config:
     SLACK_TOKEN = os.environ.get("SLACK_TOKEN")
     SLACK_MCP_URL = os.environ.get("SLACK_MCP_URL", "https://mcp.slack.com/mcp")
     ADMIN_SLACK_USER_ID = os.environ.get("ADMIN_SLACK_USER_ID")
+    SLACK_ENDPOINT_ALLOWED_DOMAINS = [
+        d.strip().lower()
+        for d in os.environ.get("SLACK_ENDPOINT_ALLOWED_DOMAINS", "salesforce.com").split(",")
+        if d.strip()
+    ]
+    SLACK_ENDPOINT_RATE_LIMIT = int(os.environ.get("SLACK_ENDPOINT_RATE_LIMIT", "5"))
+    SLACK_ENDPOINT_RATE_WINDOW_SEC = int(os.environ.get("SLACK_ENDPOINT_RATE_WINDOW_SEC", "900"))
     SQLALCHEMY_DATABASE_URI = os.environ["DATABASE_URL"].replace("postgres://", "postgresql://", 1)
     SQLALCHEMY_TRACK_MODIFICATIONS = False
