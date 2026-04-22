@@ -14,5 +14,6 @@ class Config:
     API_KEY = os.environ["API_KEY"]
     SLACK_TOKEN = os.environ.get("SLACK_TOKEN")
     SLACK_MCP_URL = os.environ.get("SLACK_MCP_URL", "https://mcp.slack.com/mcp")
+    ADMIN_SLACK_USER_ID = os.environ.get("ADMIN_SLACK_USER_ID")
     SQLALCHEMY_DATABASE_URI = os.environ["DATABASE_URL"].replace("postgres://", "postgresql://", 1)
     SQLALCHEMY_TRACK_MODIFICATIONS = False

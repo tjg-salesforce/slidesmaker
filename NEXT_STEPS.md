@@ -52,6 +52,7 @@ Existing:
 Added for canvas flow:
 - `SLACK_TOKEN` — `xoxp-…` user token used by Slack MCP
 - `SLACK_MCP_URL` — defaults to `https://mcp.slack.com/mcp`
+- `ADMIN_SLACK_USER_ID` — Slack user ID DMed with the traceback when the Slackbot auto-pipeline fails (see `POST /api/slack/generate`)
 
 Known needed but **not yet wired**:
 - `DRIVE_LABEL_ID`, `DRIVE_LABEL_FIELD_ID`, `DRIVE_LABEL_EXTERNAL_CHOICE_ID` — for automating the DLP label flip (see Known Issues §1)
@@ -72,6 +73,36 @@ Anthropic MCP connector details:
 - Passed via `extra_body={"mcp_servers": [...], "tools": [{"type":"mcp_toolset","mcp_server_name":"slack"}]}` because the installed SDK (`anthropic==0.49.0`) doesn't accept `mcp_servers` as a native kwarg
 - `authorization_token` is the raw `xoxp-…` token (no `Bearer` prefix)
 - `max_tokens=8192` for canvas extraction (45+ fields + tool-use overhead)
+
+## Slackbot auto-pipeline
+
+For skill-triggered runs (bypasses manual review):
+
+```
+POST https://slidesmaker-bded4b9587fb.herokuapp.com/api/slack/generate
+Authorization: Bearer $API_KEY
+Content-Type: application/json
+
+{
+  "email": "user@salesforce.com",
+  "slack_user_id": "U0123ABCD",
+
+  // provide either or both of these:
+  "canvas_url": "https://<workspace>.slack.com/docs/...",
+  "canvas_content": "<raw canvas markdown>"
+}
+```
+
+**Dual extraction modes:**
+- `canvas_url` (Option A): app reads the canvas via the Slack MCP connector. Known-good path. Requires the canvas to be readable by `SLACK_TOKEN`'s user.
+- `canvas_content` (Option B): app takes the raw markdown from the payload and extracts directly. No MCP hop → faster, fewer moving parts.
+- If both are sent, `canvas_content` is tried first. If extraction yields fewer than 25% populated fields (likely truncation/mangling in transit), the app falls back to the `canvas_url` MCP path automatically.
+
+Returns `202 Accepted` with `{"generation_id": N, "status": "queued"}` immediately. Slackbot should confirm to the user that the deck is being built — the app DMs `slack_user_id` with the deck URL when ready, or with an error message on failure (and DMs `ADMIN_SLACK_USER_ID` the traceback).
+
+DM delivery goes through the existing Slack MCP connector via a Haiku-powered relay call (`app/services/slack_service.py`).
+
+Error responses from the endpoint itself: `401` (bad token), `400` (missing required fields / no canvas input). Anything downstream is handled by the app's error DM path.
 
 ## V1 slide subset (what IS in the MVP)
 
