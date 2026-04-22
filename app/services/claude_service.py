@@ -38,8 +38,71 @@ def extract_from_pdf(pdf_bytes: bytes, config: dict) -> dict:
         ],
     )
 
-    raw = message.content[0].text.strip()
-    # Strip markdown fences if Claude wraps the JSON
+    return _parse_json_response(message.content[0].text)
+
+
+def extract_from_canvas(canvas_text: str, config: dict) -> dict:
+    """Send canvas markdown to Claude and return extracted fields as a dict."""
+    client = anthropic.Anthropic(api_key=current_app.config["ANTHROPIC_API_KEY"])
+
+    fields_description = "\n".join(
+        f'- "{key}": {desc}' for key, desc in config["fields"].items()
+    )
+    user_prompt = (
+        config["user_prompt_prefix"]
+        + fields_description
+        + "\n\n--- CANVAS CONTENT ---\n"
+        + canvas_text
+    )
+
+    message = client.messages.create(
+        model=config["model"],
+        max_tokens=4096,
+        system=config["system_prompt"],
+        messages=[{"role": "user", "content": user_prompt}],
+    )
+
+    return _parse_json_response(message.content[0].text)
+
+
+def extract_from_canvas_url(canvas_url: str, config: dict) -> dict:
+    """Use Slack MCP to fetch a canvas by URL, then extract fields into a dict."""
+    client = anthropic.Anthropic(api_key=current_app.config["ANTHROPIC_API_KEY"])
+
+    fields_description = "\n".join(
+        f'- "{key}": {desc}' for key, desc in config["fields"].items()
+    )
+    user_prompt = (
+        f"Use the Slack MCP tools to read the full content of the canvas at: {canvas_url}\n\n"
+        "Then extract the fields below from the canvas content and return the JSON object.\n\n"
+        + config["user_prompt_prefix"]
+        + fields_description
+    )
+
+    mcp_server = {
+        "type": "url",
+        "url": current_app.config["SLACK_MCP_URL"],
+        "name": "slack",
+        "authorization_token": f"Bearer {current_app.config['SLACK_TOKEN']}",
+    }
+
+    message = client.messages.create(
+        model=config["model"],
+        max_tokens=4096,
+        system=config["system_prompt"],
+        messages=[{"role": "user", "content": user_prompt}],
+        mcp_servers=[mcp_server],
+        extra_headers={"anthropic-beta": "mcp-client-2025-04-04"},
+    )
+
+    text_blocks = [b.text for b in message.content if getattr(b, "type", None) == "text"]
+    if not text_blocks:
+        raise RuntimeError("Claude returned no text content from canvas MCP call")
+    return _parse_json_response(text_blocks[-1])
+
+
+def _parse_json_response(raw: str) -> dict:
+    raw = raw.strip()
     if raw.startswith("```"):
         raw = raw.split("```")[1]
         if raw.startswith("json"):

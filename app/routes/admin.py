@@ -25,6 +25,49 @@ def _load_config(config_name: str = "default") -> dict:
         return json.load(f)
 
 
+@admin_bp.route("/", methods=["GET"])
+def index():
+    return redirect(url_for("admin.canvas"))
+
+
+@admin_bp.route("/canvas", methods=["GET", "POST"])
+def canvas():
+    if request.method == "GET":
+        return render_template("admin/canvas.html")
+
+    canvas_url = request.form.get("canvas_url", "").strip()
+    canvas_text = request.form.get("canvas_text", "").strip()
+    user_email = request.form.get("user_email", "").strip()
+    title = request.form.get("title", "").strip() or f"QBR Deck for {user_email}"
+
+    if not canvas_url and not canvas_text:
+        flash("Provide a canvas URL or paste canvas content.", "error")
+        return redirect(url_for("admin.canvas"))
+    if not user_email:
+        flash("Recipient email is required.", "error")
+        return redirect(url_for("admin.canvas"))
+
+    try:
+        if canvas_url:
+            record = pipeline.generate_deck_from_canvas_url(
+                canvas_url=canvas_url,
+                user_email=user_email,
+                title=title,
+            )
+        else:
+            record = pipeline.generate_deck_from_canvas(
+                canvas_text=canvas_text,
+                user_email=user_email,
+                title=title,
+            )
+    except Exception as e:
+        logger.exception("Canvas extraction failed")
+        flash(f"Extraction failed: {e}", "error")
+        return redirect(url_for("admin.canvas"))
+
+    return redirect(url_for("admin.review", id=record.id, title=title))
+
+
 @admin_bp.route("/upload", methods=["GET", "POST"])
 def upload():
     if request.method == "GET":

@@ -56,6 +56,57 @@ def generate_deck(
     return record
 
 
+def generate_deck_from_canvas(
+    canvas_text: str,
+    user_email: str,
+    title: str,
+    config_name: str = "qbr",
+) -> Generation:
+    """Extract from pasted canvas markdown, save record for admin review."""
+    return _extract_and_save(
+        extract_fn=lambda cfg: claude_service.extract_from_canvas(canvas_text, cfg),
+        user_email=user_email,
+        config_name=config_name,
+    )
+
+
+def generate_deck_from_canvas_url(
+    canvas_url: str,
+    user_email: str,
+    title: str,
+    config_name: str = "qbr",
+) -> Generation:
+    """Fetch canvas via Slack MCP, extract fields, save record for admin review."""
+    return _extract_and_save(
+        extract_fn=lambda cfg: claude_service.extract_from_canvas_url(canvas_url, cfg),
+        user_email=user_email,
+        config_name=config_name,
+    )
+
+
+def _extract_and_save(extract_fn, user_email: str, config_name: str) -> Generation:
+    config = _load_config(config_name)
+
+    record = Generation(
+        user_email=user_email,
+        status="extracting",
+    )
+    db.session.add(record)
+    db.session.commit()
+
+    try:
+        extracted = extract_fn(config)
+        record.extracted_data = extracted
+        record.status = "pending_review"
+        db.session.commit()
+    except Exception:
+        record.status = "error"
+        db.session.commit()
+        raise
+
+    return record
+
+
 def generate_deck_from_data(
     extracted_data: dict,
     user_email: str,

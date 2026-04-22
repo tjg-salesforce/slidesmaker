@@ -12,5 +12,7 @@ class Config:
     GOOGLE_REFRESH_TOKEN = os.environ["GOOGLE_REFRESH_TOKEN"]
     SLIDES_TEMPLATE_ID = os.environ["SLIDES_TEMPLATE_ID"]
     API_KEY = os.environ["API_KEY"]
+    SLACK_TOKEN = os.environ.get("SLACK_TOKEN")
+    SLACK_MCP_URL = os.environ.get("SLACK_MCP_URL", "https://mcp.slack.com/mcp")
     SQLALCHEMY_DATABASE_URI = os.environ["DATABASE_URL"].replace("postgres://", "postgresql://", 1)
     SQLALCHEMY_TRACK_MODIFICATIONS = False
