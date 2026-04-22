@@ -91,7 +91,7 @@ def extract_from_canvas_url(canvas_url: str, config: dict) -> dict:
         max_tokens=4096,
         system=config["system_prompt"],
         messages=[{"role": "user", "content": user_prompt}],
-        mcp_servers=[mcp_server],
+        extra_body={"mcp_servers": [mcp_server]},
         extra_headers={"anthropic-beta": "mcp-client-2025-04-04"},
     )
 
