@@ -1,8 +1,12 @@
 import base64
 import json
+import logging
+import re
 
 import anthropic
 from flask import current_app
+
+logger = logging.getLogger(__name__)
 
 
 def extract_from_pdf(pdf_bytes: bytes, config: dict) -> dict:
@@ -89,7 +93,7 @@ def extract_from_canvas_url(canvas_url: str, config: dict) -> dict:
 
     message = client.messages.create(
         model=config["model"],
-        max_tokens=4096,
+        max_tokens=8192,
         system=config["system_prompt"],
         messages=[{"role": "user", "content": user_prompt}],
         extra_body={"mcp_servers": [mcp_server], "tools": [mcp_toolset]},
@@ -97,9 +101,29 @@ def extract_from_canvas_url(canvas_url: str, config: dict) -> dict:
     )
 
     text_blocks = [b.text for b in message.content if getattr(b, "type", None) == "text"]
-    if not text_blocks:
-        raise RuntimeError("Claude returned no text content from canvas MCP call")
-    return _parse_json_response(text_blocks[-1])
+    combined = "\n".join(text_blocks).strip()
+
+    if not combined:
+        block_types = [getattr(b, "type", "?") for b in message.content]
+        logger.error(
+            "Canvas MCP call returned no text content. stop_reason=%s block_types=%s",
+            message.stop_reason, block_types,
+        )
+        raise RuntimeError(
+            f"Claude returned no text (stop_reason={message.stop_reason}, blocks={block_types})"
+        )
+
+    try:
+        return _parse_json_response(combined)
+    except json.JSONDecodeError:
+        match = re.search(r"\{.*\}", combined, re.DOTALL)
+        if match:
+            return json.loads(match.group(0))
+        logger.error(
+            "Could not parse JSON from canvas MCP response. stop_reason=%s raw=%r",
+            message.stop_reason, combined[:2000],
+        )
+        raise
 
 
 def _parse_json_response(raw: str) -> dict:
