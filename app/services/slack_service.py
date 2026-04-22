@@ -37,27 +37,42 @@ def send_dm(user_id: str, text: str) -> bool:
 
     client = anthropic.Anthropic(api_key=current_app.config["ANTHROPIC_API_KEY"])
     prompt = (
-        f"Send a direct message to the Slack user with ID {user_id}. "
-        "Use the Slack MCP tools to open a DM conversation with that user and post the message. "
+        f"Post a direct message to the Slack user with ID {user_id}. "
+        "You MUST use the Slack MCP tools to actually send the message — do not just reply with text. "
+        "Typical flow: call the Slack MCP tool that opens or retrieves a DM conversation with that user ID, "
+        "then call the tool that posts a message to that conversation. "
         "The message text to post, verbatim (do not paraphrase, translate, summarize, or add any commentary):\n\n"
         f"---\n{text}\n---\n\n"
-        "After the message is posted, reply with the single word: sent"
+        "After you have actually posted the message via an MCP tool call, reply with the single word: sent"
     )
     try:
         message = client.messages.create(
             model=NOTIFY_MODEL,
-            max_tokens=1024,
-            system="You are a reliable messaging relay. Use the Slack MCP tools to deliver exact messages to specified user IDs.",
+            max_tokens=2048,
+            system="You are a reliable messaging relay. Always deliver messages by invoking the Slack MCP tools — never just acknowledge in text without calling a tool.",
             messages=[{"role": "user", "content": prompt}],
             **_mcp_kwargs(),
         )
-        logger.info(
-            "Slack DM relay to %s: stop_reason=%s blocks=%s",
-            user_id,
-            message.stop_reason,
-            [getattr(b, "type", "?") for b in message.content],
-        )
-        return True
     except Exception:
-        logger.exception("Slack DM relay failed for user %s", user_id)
+        logger.exception("Slack DM relay raised for user %s", user_id)
         return False
+
+    block_types = [getattr(b, "type", "?") for b in message.content]
+    tool_calls = [b for b in message.content if getattr(b, "type", "") in ("tool_use", "mcp_tool_use")]
+    text_reply = " | ".join(
+        getattr(b, "text", "") for b in message.content if getattr(b, "type", None) == "text"
+    ).strip()
+
+    logger.info(
+        "Slack DM relay to %s: stop_reason=%s blocks=%s tool_calls=%d text=%r",
+        user_id, message.stop_reason, block_types, len(tool_calls), text_reply[:500],
+    )
+
+    if not tool_calls:
+        logger.error(
+            "Slack DM relay to %s invoked no MCP tools — message was NOT delivered. "
+            "model reply=%r blocks=%s",
+            user_id, text_reply[:500], block_types,
+        )
+        return False
+    return True

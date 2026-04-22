@@ -1,3 +1,5 @@
+import logging
+
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
@@ -7,8 +9,14 @@ migrate = Migrate()
 
 
 def create_app():
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    )
+
     app = Flask(__name__)
     app.config.from_object("app.config.Config")
+    app.logger.setLevel(logging.INFO)
 
     db.init_app(app)
     migrate.init_app(app, db)
