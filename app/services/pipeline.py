@@ -56,42 +56,28 @@ def generate_deck(
     return record
 
 
-def generate_deck_from_canvas(
-    canvas_text: str,
-    user_email: str,
-    title: str,
-    config_name: str = "qbr",
-) -> Generation:
-    """Extract from pasted canvas markdown, save record for admin review."""
-    return _extract_and_save(
+def extract_canvas_text_into(record_id: int, canvas_text: str, config_name: str = "qbr") -> None:
+    """Extract from pasted canvas markdown into an existing Generation record."""
+    _extract_into(
+        record_id=record_id,
+        config_name=config_name,
         extract_fn=lambda cfg: claude_service.extract_from_canvas(canvas_text, cfg),
-        user_email=user_email,
-        config_name=config_name,
     )
 
 
-def generate_deck_from_canvas_url(
-    canvas_url: str,
-    user_email: str,
-    title: str,
-    config_name: str = "qbr",
-) -> Generation:
-    """Fetch canvas via Slack MCP, extract fields, save record for admin review."""
-    return _extract_and_save(
+def extract_canvas_url_into(record_id: int, canvas_url: str, config_name: str = "qbr") -> None:
+    """Fetch canvas via Slack MCP and extract into an existing Generation record."""
+    _extract_into(
+        record_id=record_id,
+        config_name=config_name,
         extract_fn=lambda cfg: claude_service.extract_from_canvas_url(canvas_url, cfg),
-        user_email=user_email,
-        config_name=config_name,
     )
 
 
-def _extract_and_save(extract_fn, user_email: str, config_name: str) -> Generation:
+def _extract_into(record_id: int, config_name: str, extract_fn) -> None:
     config = _load_config(config_name)
-
-    record = Generation(
-        user_email=user_email,
-        status="extracting",
-    )
-    db.session.add(record)
+    record = Generation.query.get(record_id)
+    record.status = "extracting"
     db.session.commit()
 
     try:
@@ -103,8 +89,6 @@ def _extract_and_save(extract_fn, user_email: str, config_name: str) -> Generati
         record.status = "error"
         db.session.commit()
         raise
-
-    return record
 
 
 def generate_deck_from_data(

@@ -1,8 +1,9 @@
 import json
 import logging
 import os
+import threading
 
-from flask import Blueprint, flash, redirect, render_template, request, url_for
+from flask import Blueprint, current_app, flash, redirect, render_template, request, url_for
 
 from app import db
 from app.models import Generation
@@ -47,25 +48,42 @@ def canvas():
         flash("Recipient email is required.", "error")
         return redirect(url_for("admin.canvas"))
 
-    try:
-        if canvas_url:
-            record = pipeline.generate_deck_from_canvas_url(
-                canvas_url=canvas_url,
-                user_email=user_email,
-                title=title,
-            )
-        else:
-            record = pipeline.generate_deck_from_canvas(
-                canvas_text=canvas_text,
-                user_email=user_email,
-                title=title,
-            )
-    except Exception as e:
-        logger.exception("Canvas extraction failed")
-        flash(f"Extraction failed: {e}", "error")
-        return redirect(url_for("admin.canvas"))
+    record = Generation(user_email=user_email, status="queued")
+    db.session.add(record)
+    db.session.commit()
+    record_id = record.id
 
-    return redirect(url_for("admin.review", id=record.id, title=title))
+    app = current_app._get_current_object()
+
+    def _run_extraction():
+        with app.app_context():
+            try:
+                if canvas_url:
+                    pipeline.extract_canvas_url_into(record_id, canvas_url)
+                else:
+                    pipeline.extract_canvas_text_into(record_id, canvas_text)
+            except Exception:
+                app.logger.exception("Background extraction failed for record %s", record_id)
+
+    threading.Thread(target=_run_extraction, daemon=True).start()
+
+    return redirect(url_for("admin.status", id=record_id, title=title))
+
+
+@admin_bp.route("/status/<int:id>")
+def status(id):
+    record = Generation.query.get_or_404(id)
+    title = request.args.get("title") or f"Deck #{id}"
+
+    if record.status == "pending_review":
+        return redirect(url_for("admin.review", id=id, title=title))
+
+    return render_template(
+        "admin/status.html",
+        record=record,
+        title=title,
+        is_error=(record.status == "error"),
+    )
 
 
 @admin_bp.route("/upload", methods=["GET", "POST"])

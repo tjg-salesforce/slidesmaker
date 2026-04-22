@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}{{ "Extraction failed" if is_error else "Processing…" }} — SlidesMaker{% endblock %}
+{% block content %}
+{% if is_error %}
+  <h2>Extraction failed</h2>
+  <p>Record #{{ record.id }} — something went wrong during extraction.</p>
+  <p>Check Heroku logs (<code>heroku logs --tail -a slidesmaker</code>) for the traceback, then retry.</p>
+  <p><a href="{{ url_for('admin.canvas') }}" role="button">Start over</a></p>
+{% else %}
+  <meta http-equiv="refresh" content="3">
+  <h2>Extracting canvas…</h2>
+  <p>Status: <strong>{{ record.status }}</strong></p>
+  <p>This page refreshes every 3 seconds. You'll be redirected to the review page when extraction completes. Typical runtime: 30–90 seconds.</p>
+{% endif %}
+{% endblock %}
