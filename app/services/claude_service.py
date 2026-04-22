@@ -85,14 +85,15 @@ def extract_from_canvas_url(canvas_url: str, config: dict) -> dict:
         "name": "slack",
         "authorization_token": current_app.config["SLACK_TOKEN"],
     }
+    mcp_toolset = {"type": "mcp_toolset", "mcp_server_name": "slack"}
 
     message = client.messages.create(
         model=config["model"],
         max_tokens=4096,
         system=config["system_prompt"],
         messages=[{"role": "user", "content": user_prompt}],
-        extra_body={"mcp_servers": [mcp_server]},
-        extra_headers={"anthropic-beta": "mcp-client-2025-04-04"},
+        extra_body={"mcp_servers": [mcp_server], "tools": [mcp_toolset]},
+        extra_headers={"anthropic-beta": "mcp-client-2025-11-20"},
     )
 
     text_blocks = [b.text for b in message.content if getattr(b, "type", None) == "text"]
