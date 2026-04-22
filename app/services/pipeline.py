@@ -2,8 +2,6 @@ import json
 import logging
 import os
 
-from flask import current_app
-
 from app import db
 from app.models import Generation
 from app.services import claude_service, google_service
@@ -184,26 +182,25 @@ def _extract_with_fallback(canvas_url: str, canvas_content: str, config: dict) -
     return claude_service.extract_from_canvas_url(canvas_url, config)
 
 
-def generate_deck_auto(
+def generate_deck_sync(
     record_id: int,
     canvas_url: str,
     canvas_content: str,
     user_email: str,
-    slack_user_id: str,
     title: str,
     config_name: str = "qbr",
-) -> None:
-    """End-to-end auto flow for Slackbot-triggered runs: extract → build → DM.
+) -> str:
+    """End-to-end sync flow for the Slackbot endpoint: extract → build → return deck_url.
 
     Accepts either canvas_url (MCP path) or canvas_content (raw markdown) or
     both. Content is preferred; URL is used as fallback if content extraction
     yields a sparsely-populated result. Skips the manual review step.
-    """
-    from app.services import slack_service
 
+    Raises on failure; caller (request handler) is responsible for returning
+    an error payload to the client.
+    """
     config = _load_config(config_name)
     record = Generation.query.get(record_id)
-    admin_user_id = current_app.config.get("ADMIN_SLACK_USER_ID")
 
     try:
         record.status = "extracting"
@@ -219,28 +216,9 @@ def generate_deck_auto(
         record.status = "done"
         db.session.commit()
 
-        slack_service.send_dm(
-            slack_user_id,
-            f"Your QBR deck is ready: {deck_url}",
-        )
-    except Exception as exc:
-        logger.exception("Auto pipeline failed for record %s", record_id)
+        return deck_url
+    except Exception:
+        logger.exception("Sync pipeline failed for record %s", record_id)
         record.status = "error"
         db.session.commit()
-
-        slack_service.send_dm(
-            slack_user_id,
-            "There was an issue generating your QBR deck. The team has been notified and will look into it.",
-        )
-        if admin_user_id:
-            slack_service.send_dm(
-                admin_user_id,
-                (
-                    f":warning: QBR deck generation failed\n"
-                    f"record_id: {record_id}\n"
-                    f"user: {user_email} ({slack_user_id})\n"
-                    f"inputs: url={bool(canvas_url)}, content_len={len(canvas_content or '')}\n"
-                    f"error: {type(exc).__name__}: {exc}"
-                ),
-            )
         raise

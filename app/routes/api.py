@@ -1,13 +1,16 @@
+import json
 import threading
 import time
 from collections import defaultdict, deque
 from threading import Lock
 
-from flask import Blueprint, current_app, jsonify, request
+from flask import Blueprint, Response, current_app, jsonify, request, stream_with_context
 
 from app import db
 from app.models import Generation
 from app.services import pipeline
+
+KEEPALIVE_INTERVAL_SEC = 15
 
 api_bp = Blueprint("api", __name__, url_prefix="/api")
 
@@ -80,17 +83,20 @@ def generate():
 
 @api_bp.route("/slack/generate", methods=["POST"])
 def slack_generate():
-    """Slackbot-triggered auto deck generation.
+    """Slackbot-triggered synchronous deck generation.
 
     Body (JSON): {email, slack_user_id, canvas_url?, canvas_content?}
       - Must provide at least one of canvas_url or canvas_content.
       - If both provided, canvas_content is tried first; canvas_url is used
         as fallback when content extraction yields sparse data.
-    No Bearer auth: scope-fenced by email-domain allowlist + per-user
-    rate limit instead (so the skill canvas can be widely shared without
-    leaking a secret).
-    Returns: 202 {generation_id, status} immediately; deck link is DM'd to
-    slack_user_id when ready (or an error DM on failure).
+      - slack_user_id is kept for per-user rate limiting + logging.
+    No Bearer auth: scope-fenced by email-domain allowlist + per-user rate
+    limit so the skill canvas can be widely shared without a secret.
+    Response: 200 OK with streamed keep-alive whitespace during the ~60–90s
+    pipeline, followed by JSON.
+      - success: {"deck_url": "..."}
+      - failure mid-pipeline: {"error": "generation_failed", "message": "..."}
+    Pre-stream validation still returns proper 400/403/429.
     """
     data = request.get_json(silent=True) or {}
     canvas_url = (data.get("canvas_url") or "").strip()
@@ -143,23 +149,50 @@ def slack_generate():
     )
 
     flask_app = current_app._get_current_object()
+    work_result: dict = {}
 
-    def _run():
+    def _work():
         with flask_app.app_context():
             try:
-                pipeline.generate_deck_auto(
+                deck_url = pipeline.generate_deck_sync(
                     record_id=record_id,
                     canvas_url=canvas_url,
                     canvas_content=canvas_content,
                     user_email=email,
-                    slack_user_id=slack_user_id,
                     title=title,
                 )
-            except Exception:
-                flask_app.logger.exception(
-                    "Slack auto-pipeline failed for record %s", record_id
-                )
+                work_result["deck_url"] = deck_url
+            except Exception as exc:
+                work_result["error"] = f"{type(exc).__name__}: {exc}"
 
-    threading.Thread(target=_run, daemon=True).start()
+    def _stream():
+        t = threading.Thread(target=_work, daemon=True)
+        t.start()
+        # Flush response headers immediately so Heroku's 30s first-byte
+        # timer is satisfied even though the pipeline runs 60–90s.
+        yield " "
+        while True:
+            t.join(timeout=KEEPALIVE_INTERVAL_SEC)
+            if not t.is_alive():
+                break
+            yield " "
+        if "deck_url" in work_result:
+            flask_app.logger.info(
+                "slack/generate completed: record=%d deck_url=%s",
+                record_id, work_result["deck_url"],
+            )
+            yield json.dumps({"deck_url": work_result["deck_url"]})
+        else:
+            flask_app.logger.warning(
+                "slack/generate failed: record=%d error=%s",
+                record_id, work_result.get("error"),
+            )
+            yield json.dumps({
+                "error": "generation_failed",
+                "message": work_result.get("error", "unknown error"),
+            })
 
-    return jsonify({"generation_id": record_id, "status": "queued"}), 202
+    return Response(
+        stream_with_context(_stream()),
+        mimetype="application/json",
+    )

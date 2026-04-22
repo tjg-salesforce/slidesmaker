@@ -77,7 +77,7 @@ Anthropic MCP connector details:
 - `authorization_token` is the raw `xoxp-…` token (no `Bearer` prefix)
 - `max_tokens=8192` for canvas extraction (45+ fields + tool-use overhead)
 
-## Slackbot auto-pipeline
+## Slackbot synchronous endpoint
 
 For skill-triggered runs (bypasses manual review):
 
@@ -95,22 +95,28 @@ Content-Type: application/json
 }
 ```
 
+**Synchronous response model.** The endpoint holds the connection open for the full pipeline (~60–90s typical, 2min worst case) and returns:
+
+- **Success:** `{"deck_url": "https://docs.google.com/presentation/d/..."}`
+- **Failure mid-pipeline:** `{"error": "generation_failed", "message": "<one-line reason>"}`
+- **Pre-stream validation errors:** `400` (missing fields), `403` (email domain not allowed), `429` (rate limit exceeded, with `Retry-After` header)
+
+Slackbot should branch on the presence of `error` in the parsed JSON, not on status code — mid-pipeline failures return HTTP `200` because the streaming response has already committed headers by the time the pipeline runs.
+
+**How it holds the connection.** Heroku's router has a 30s first-byte timeout and 55s between-bytes timeout. The endpoint streams a keep-alive space every 15s while a background thread runs the pipeline; headers flush immediately, and the final JSON is appended when work completes. Leading whitespace before JSON is RFC 8259 valid and is parsed transparently by any standard JSON library. Gunicorn worker timeout is bumped to 180s in the `Procfile`.
+
 **Auth model:** no Bearer token (the skill canvas is widely shared, so secrets can't live there). Requests are scope-fenced by:
 - **email-domain allowlist** (`SLACK_ENDPOINT_ALLOWED_DOMAINS`, default `salesforce.com`) — rejects 403 if the recipient email's domain isn't in the list
 - **per-user rate limit** (`SLACK_ENDPOINT_RATE_LIMIT` / `SLACK_ENDPOINT_RATE_WINDOW_SEC`, default 5 req / 15 min per `slack_user_id`) — rejects 429 with `Retry-After` header when exceeded
-
-Residual risk (documented, not yet mitigated): a `@salesforce.com`-credentialed attacker can still trigger a DM from our Slack user to any target slack_user_id with a deck link containing attacker-controlled content (narrow internal phishing vector). If this graduates to a concern, next step is verifying `slack_user_id`'s email via MCP and requiring it match `email`.
 
 **Dual extraction modes:**
 - `canvas_url` (Option A): app reads the canvas via the Slack MCP connector. Known-good path. Requires the canvas to be readable by `SLACK_TOKEN`'s user.
 - `canvas_content` (Option B): app takes the raw markdown from the payload and extracts directly. No MCP hop → faster, fewer moving parts.
 - If both are sent, `canvas_content` is tried first. If extraction yields fewer than 25% populated fields (likely truncation/mangling in transit), the app falls back to the `canvas_url` MCP path automatically.
 
-Returns `202 Accepted` with `{"generation_id": N, "status": "queued"}` immediately. Slackbot should confirm to the user that the deck is being built — the app DMs `slack_user_id` with the deck URL when ready, or with an error message on failure (and DMs `ADMIN_SLACK_USER_ID` the traceback).
+The app no longer sends Slack DMs — Slackbot posts the deck link itself from the synchronous response. `app/services/slack_service.py` is retained as dead code in case a proper Slack bot token becomes available later and we want a parallel notification path.
 
-DM delivery goes through the existing Slack MCP connector via a Haiku-powered relay call (`app/services/slack_service.py`).
-
-Error responses from the endpoint itself: `401` (bad token), `400` (missing required fields / no canvas input). Anything downstream is handled by the app's error DM path.
+Residual risk (documented, not yet mitigated): a `@salesforce.com`-credentialed attacker could spam the endpoint to waste Anthropic/Google credits. Rate limit blunts this; a proper bot token + signed-request verification would close it fully.
 
 ## V1 slide subset (what IS in the MVP)
 
