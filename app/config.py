@@ -22,5 +22,6 @@ class Config:
     ]
     SLACK_ENDPOINT_RATE_LIMIT = int(os.environ.get("SLACK_ENDPOINT_RATE_LIMIT", "5"))
     SLACK_ENDPOINT_RATE_WINDOW_SEC = int(os.environ.get("SLACK_ENDPOINT_RATE_WINDOW_SEC", "900"))
+    APPS_SCRIPT_URL = os.environ.get("APPS_SCRIPT_URL", "")
     SQLALCHEMY_DATABASE_URI = os.environ["DATABASE_URL"].replace("postgres://", "postgresql://", 1)
     SQLALCHEMY_TRACK_MODIFICATIONS = False

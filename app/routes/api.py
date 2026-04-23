@@ -4,6 +4,7 @@ import time
 from collections import defaultdict, deque
 from threading import Lock
 
+import requests as http_requests
 from flask import Blueprint, Response, current_app, jsonify, request, stream_with_context
 
 from app import db
@@ -196,3 +197,29 @@ def slack_generate():
         stream_with_context(_stream()),
         mimetype="application/json",
     )
+
+
+@api_bp.route("/appscript/generate", methods=["POST"])
+def appscript_generate():
+    """Proxy: forward token payload to Apps Script and return the deck URL."""
+    apps_script_url = current_app.config.get("APPS_SCRIPT_URL")
+    if not apps_script_url:
+        return jsonify({"error": "APPS_SCRIPT_URL not configured"}), 500
+
+    data = request.get_json(silent=True) or {}
+
+    if not data.get("user_email"):
+        return jsonify({"error": "missing user_email"}), 400
+    if not data.get("replacements"):
+        return jsonify({"error": "missing replacements"}), 400
+
+    resp = http_requests.post(apps_script_url, json=data, timeout=120)
+    try:
+        result = resp.json()
+    except Exception:
+        return jsonify({"error": "Apps Script returned non-JSON", "body": resp.text[:500]}), 502
+
+    if "error" in result:
+        return jsonify(result), 502
+
+    return jsonify(result)
