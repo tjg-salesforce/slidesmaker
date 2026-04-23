@@ -62,11 +62,11 @@
     "ws_4_status": "Status + path forward bullets for workstream 4.",
 
     "innovation_theme_1_name": "Name of innovation theme 1 from § 7 (short phrase, e.g., 'Agentforce').",
-    "innovation_theme_1_description": "2–3 sentence 'why it matters for this customer' description, grounded in the customer's stated priorities.",
+    "innovation_theme_1_description": {"description": "2–3 sentence 'why it matters for this customer' description, grounded in the customer's stated priorities.", "max_length": 325},
     "innovation_theme_2_name": "Name of innovation theme 2.",
-    "innovation_theme_2_description": "2–3 sentence description for theme 2.",
+    "innovation_theme_2_description": {"description": "2–3 sentence description for theme 2.", "max_length": 325},
     "innovation_theme_3_name": "Name of innovation theme 3.",
-    "innovation_theme_3_description": "2–3 sentence description for theme 3.",
+    "innovation_theme_3_description": {"description": "2–3 sentence description for theme 3.", "max_length": 325},
 
     "map_row_1_workstream": "Workstream name for mutual action plan row 1 (group related actions from § 8). Short phrase.",
     "map_row_1_focus_area": "Focus area for row 1 (2–5 words, e.g., 'Adoption & License Optimization').",
